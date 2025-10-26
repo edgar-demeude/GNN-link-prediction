@@ -1,37 +1,22 @@
 name: gnn_project
 channels:
-  - pytorch
   - pyg
+  - nvidia
+  - pytorch
   - conda-forge
   - defaults
 dependencies:
-  # Python and Core Libraries
   - python=3.10
   - pip
   - numpy
   - pandas
   - scikit-learn
   - networkx
-
-  # PyTorch
-  - pytorch=2.0.1
-  - torchaudio
+  - pytorch
   - torchvision
-  - cpuonly # Use cpuonly for CPU version, remove if installing CUDA version
-
-  # Plotting and Geospatial Libraries
+  - torchaudio
+  - pytorch-cuda=12.1
   - matplotlib
-  - cartopy=0.21.1 # Required for geographical plotting
-
-  # Jupyter
+  - cartopy=0.21.1
   - jupyter
-
-  # PyTorch Geometric (PyG) Dependencies (CPU-Only)
-  - pip:
-      # Install specific versions of torch-scatter and torch-sparse
-      # These need to match your PyTorch/CUDA version. 
-      # The pyg:: channel provides them for CPU, but pip is often more reliable
-      # or faster for a specific configuration.
-      - torch-scatter
-      - torch-sparse
-      - torch-geometric
+  - pyg
