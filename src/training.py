@@ -26,18 +26,18 @@ def train_and_evaluate(run_seed: int, data, device, model, optimizer):
         model.eval()
         with torch.no_grad():
             z = model.encode(data.x, data.train_pos_edge_index)
-            # Pass model instance to get_loss for val loss calculation
             loss = get_loss(model, z, pos_edge_index, data.num_nodes)
-            
             pos_pred = model.decode(z, pos_edge_index, sigmoid=True)
             neg_pred = model.decode(z, neg_edge_index, sigmoid=True)
-            
-            y_true = torch.cat([torch.ones(pos_pred.size(0)), torch.zeros(neg_pred.size(0))]).cpu().numpy()
+
+            y_true = torch.cat([
+                torch.ones(pos_pred.size(0)), torch.zeros(neg_pred.size(0))
+            ]).cpu().numpy()
             y_pred = torch.cat([pos_pred, neg_pred]).cpu().numpy()
-            
+
             auc = roc_auc_score(y_true, y_pred)
             ap = average_precision_score(y_true, y_pred)
-        
+
         return loss.item(), auc, ap
     
     # 4. Training loop initialization

@@ -18,12 +18,12 @@ def set_seed(seed: int):
         torch.cuda.manual_seed_all(seed)
 
 def get_loss(model, z, pos_edge_index, num_nodes, temperature=1.0):
-    """Calculates the combined BCE + KL loss with weight balancing."""
-    
+    """Calculates BCE + optional KL (for VGAE)."""
+
     pos_edge_index = pos_edge_index.long()
     pos_logits = model.decode(z, pos_edge_index, sigmoid=False) / temperature
-    
-    # Negative edge sampling (1:1 ratio)
+
+    # Negative sampling
     neg_edge_index = negative_sampling(
         edge_index=pos_edge_index,
         num_nodes=num_nodes,
@@ -31,32 +31,31 @@ def get_loss(model, z, pos_edge_index, num_nodes, temperature=1.0):
     )
     neg_logits = model.decode(z, neg_edge_index, sigmoid=False) / temperature
 
+    # Labels
     pos_labels = torch.ones_like(pos_logits)
     neg_labels = torch.zeros_like(neg_logits)
     all_logits = torch.cat([pos_logits, neg_logits])
     all_labels = torch.cat([pos_labels, neg_labels])
 
-    # Calculate real-world positive weight (sparse graph compensation)
+    # Positive weighting (for sparse graphs)
     num_pos = pos_edge_index.size(1)
-
-    # Total possible unique edges in an undirected graph
     num_possible_edges = num_nodes * (num_nodes - 1) // 2
     num_neg_real = num_possible_edges - num_pos
+    pos_weight_value = min(num_neg_real / num_pos, 10.0)
+    pos_weight_tensor = torch.tensor(pos_weight_value, dtype=torch.float, device=all_logits.device)
 
-    # Calculate weight: ratio of true negatives to true positives, capped at 10.0
-    pos_weight_value = min(num_neg_real / num_pos, 10.0) 
-    pos_weight_tensor = torch.tensor(pos_weight_value, dtype=torch.float, device=all_logits.device) 
-    
-    # BCE Loss
+    # BCE
     bce_loss = F.binary_cross_entropy_with_logits(
-        all_logits,
-        all_labels,
-        pos_weight=pos_weight_tensor
+        all_logits, all_labels, pos_weight=pos_weight_tensor
     )
 
-    # KL Divergence Loss
-    kl_loss = (1 / num_nodes) * model.kl_loss()
-    return bce_loss + 0.1 * kl_loss # beta = 0.1
+    # Add KL only if model has it
+    kl_loss = 0.0
+    if hasattr(model, "kl_loss"):
+        kl_loss = (1 / num_nodes) * model.kl_loss()
+
+    return bce_loss + 0.1 * kl_loss
+
 
 def aggregate_stats(test_aucs: list, test_aps: list, n_runs: int, confidence_level=0.95):
     """Calculates mean, std, and confidence interval for AUC and AP."""
