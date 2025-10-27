@@ -65,3 +65,41 @@ class GCNLinkPredictor(torch.nn.Module):
         logits = z @ z.T
         
         return torch.sigmoid(logits) if sigmoid else logits
+
+class MLPLinkPredictor(torch.nn.Module):
+    """
+    Classic MLP model for link prediction without graph structure.
+    Encodes node features into latent embeddings using fully connected layers,
+    then decodes links via dot product similarity.
+    """
+    def __init__(self, in_channels, hidden_channels, out_channels, 
+                 num_layers=3, dropout=0.3):
+        super().__init__()
+        self.dropout = dropout
+
+        # --- Encoder: multilayer perceptron ---
+        layers = []
+        layers.append(torch.nn.Linear(in_channels, hidden_channels))
+        for _ in range(num_layers - 2):
+            layers.append(torch.nn.Linear(hidden_channels, hidden_channels))
+        layers.append(torch.nn.Linear(hidden_channels, out_channels))
+        self.layers = torch.nn.ModuleList(layers)
+
+    def encode(self, x, edge_index=None):
+        """Encode node features into latent embeddings."""
+        for i, layer in enumerate(self.layers[:-1]):
+            x = F.relu(layer(x))
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.layers[-1](x)
+        return x
+
+    def decode(self, z, edge_index, sigmoid=True):
+        """Decode links using dot product similarity."""
+        src, dst = edge_index
+        logits = (z[src] * z[dst]).sum(dim=-1)
+        return torch.sigmoid(logits) if sigmoid else logits
+
+    def decode_all(self, z, sigmoid=True):
+        """Compute full adjacency reconstruction from embeddings."""
+        logits = z @ z.T
+        return torch.sigmoid(logits) if sigmoid else logits
